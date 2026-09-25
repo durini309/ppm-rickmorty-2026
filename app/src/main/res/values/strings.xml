@@ -1,0 +1,12 @@
+<resources>
+    <string name="app_name">Rick and Morty</string>
+    <string name="login_logo_description">Logo de Rick and Morty</string>
+    <string name="login_start">Entrar</string>
+    <string name="login_student">Juan Carlos Durini - #Carné</string>
+    <string name="characters_title">Characters</string>
+    <string name="character_detail_title">Character details</string>
+    <string name="character_detail_species">Species:</string>
+    <string name="character_detail_status">Status:</string>
+    <string name="character_detail_gender">Gender:</string>
+    <string name="navigate_back">Regresar</string>
+</resources>
