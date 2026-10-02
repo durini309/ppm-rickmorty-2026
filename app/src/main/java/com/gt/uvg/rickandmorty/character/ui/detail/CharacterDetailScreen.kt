@@ -3,10 +3,8 @@ package com.gt.uvg.rickandmorty.character.ui.detail
 import android.content.res.Configuration
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -35,6 +33,7 @@ import com.gt.uvg.rickandmorty.R
 import com.gt.uvg.rickandmorty.character.data.Character
 import com.gt.uvg.rickandmorty.character.data.CharacterDb
 import com.gt.uvg.rickandmorty.character.ui.CharacterImage
+import com.gt.uvg.rickandmorty.core.ui.components.PropertyRow
 import com.gt.uvg.rickandmorty.core.ui.theme.RickAndMortyTheme
 import kotlinx.serialization.Serializable
 
@@ -119,43 +118,20 @@ private fun CharacterDetailScreen(
             )
             Spacer(modifier = Modifier.height(32.dp))
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                CharacterProperty(
+                PropertyRow(
                     label = stringResource(R.string.character_detail_species),
                     value = character.species
                 )
-                CharacterProperty(
+                PropertyRow(
                     label = stringResource(R.string.character_detail_status),
                     value = character.status
                 )
-                CharacterProperty(
+                PropertyRow(
                     label = stringResource(R.string.character_detail_gender),
                     value = character.gender
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun CharacterProperty(
-    label: String,
-    value: String,
-    modifier: Modifier = Modifier
-) {
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
     }
 }
 

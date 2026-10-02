@@ -131,7 +131,7 @@ private fun CharacterItem(
 private fun PreviewCharactersScreen() {
     RickAndMortyTheme {
         CharactersScreen(
-            characters = CharacterDb().getAllCharacters(),
+            characters = listOf(),
             onCharacterClick = {}
         )
     }

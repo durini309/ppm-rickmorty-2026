@@ -8,5 +8,17 @@
     <string name="character_detail_species">Species:</string>
     <string name="character_detail_status">Status:</string>
     <string name="character_detail_gender">Gender:</string>
+    <string name="locations_title">Locations</string>
+    <string name="location_detail_title">Location details</string>
+    <string name="location_detail_id">ID:</string>
+    <string name="location_detail_type">Type:</string>
+    <string name="location_detail_dimension">Dimension:</string>
+    <string name="profile_title">Profile</string>
+    <string name="profile_image_description">Imagen de perfil</string>
+    <string name="profile_name_label">Nombre:</string>
+    <string name="profile_name">Juan Carlos Durini</string>
+    <string name="profile_student_id_label">Carné:</string>
+    <string name="profile_student_id">1201613</string>
+    <string name="profile_logout">Cerrar sesión</string>
     <string name="navigate_back">Regresar</string>
 </resources>
