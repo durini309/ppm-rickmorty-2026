@@ -16,6 +16,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -24,6 +26,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavOptions
@@ -33,6 +37,8 @@ import com.gt.uvg.rickandmorty.R
 import com.gt.uvg.rickandmorty.character.data.Character
 import com.gt.uvg.rickandmorty.character.data.CharacterDb
 import com.gt.uvg.rickandmorty.character.ui.CharacterImage
+import com.gt.uvg.rickandmorty.core.ui.components.ErrorLayout
+import com.gt.uvg.rickandmorty.core.ui.components.LoadingLayout
 import com.gt.uvg.rickandmorty.core.ui.components.PropertyRow
 import com.gt.uvg.rickandmorty.core.ui.theme.RickAndMortyTheme
 import kotlinx.serialization.Serializable
@@ -49,9 +55,7 @@ fun NavController.navigateToCharacterDetail(
 
 fun NavGraphBuilder.characterDetailScreen(onBackClick: () -> Unit) {
     composable<CharacterDetailDestination> { backStackEntry ->
-        val destination = backStackEntry.toRoute<CharacterDetailDestination>()
         CharacterDetailRoute(
-            characterId = destination.characterId,
             onBackClick = onBackClick
         )
     }
@@ -59,12 +63,15 @@ fun NavGraphBuilder.characterDetailScreen(onBackClick: () -> Unit) {
 
 @Composable
 fun CharacterDetailRoute(
-    characterId: Int,
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    viewModel: CharacterDetailViewModel = viewModel()
 ) {
-    val character = remember(characterId) { CharacterDb().getCharacterById(characterId) }
+    val state by viewModel.state.collectAsStateWithLifecycle()
     CharacterDetailScreen(
-        character = character,
+        state = state,
+        onEvent = { event ->
+            viewModel.onEvent(event)
+        },
         onBackClick = onBackClick
     )
 }
@@ -72,7 +79,8 @@ fun CharacterDetailRoute(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CharacterDetailScreen(
-    character: Character,
+    state: CharacterDetailState,
+    onEvent: (CharacterDetailEvent) -> Unit,
     onBackClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -97,40 +105,78 @@ private fun CharacterDetailScreen(
             )
         }
     ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .padding(horizontal = 48.dp, vertical = 16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            CharacterImage(
-                imageUrl = character.image,
-                contentDescription = character.name,
-                size = 200.dp
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = character.name,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Spacer(modifier = Modifier.height(32.dp))
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                PropertyRow(
-                    label = stringResource(R.string.character_detail_species),
-                    value = character.species
-                )
-                PropertyRow(
-                    label = stringResource(R.string.character_detail_status),
-                    value = character.status
-                )
-                PropertyRow(
-                    label = stringResource(R.string.character_detail_gender),
-                    value = character.gender
+        when {
+            state.isLoading -> {
+                LoadingLayout(
+                    onClick = {
+                        onEvent(CharacterDetailEvent.LoadingClick)
+                    },
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding)
                 )
             }
+
+            state.hasError -> {
+                ErrorLayout(
+                    onRetryClick = {
+                        onEvent(CharacterDetailEvent.RetryClick)
+                    },
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding)
+                )
+            }
+
+            else -> {
+                CharacterDetailSuccessState(
+                    character = state.character!!,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding)
+                        .padding(horizontal = 48.dp, vertical = 16.dp)
+                )
+            }
+        }
+
+    }
+}
+
+@Composable
+fun CharacterDetailSuccessState(
+    character: Character,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        CharacterImage(
+            imageUrl = character.image,
+            contentDescription = character.name,
+            size = 200.dp
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = character.name,
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Spacer(modifier = Modifier.height(32.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            PropertyRow(
+                label = stringResource(R.string.character_detail_species),
+                value = character.species
+            )
+            PropertyRow(
+                label = stringResource(R.string.character_detail_status),
+                value = character.status
+            )
+            PropertyRow(
+                label = stringResource(R.string.character_detail_gender),
+                value = character.gender
+            )
         }
     }
 }
@@ -138,11 +184,58 @@ private fun CharacterDetailScreen(
 @Preview(name = "Light", showBackground = true)
 @Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
-private fun PreviewCharacterDetailScreen() {
+private fun PreviewCharacterDetailScreen_Loading() {
     RickAndMortyTheme {
         CharacterDetailScreen(
-            character = CharacterDb().getCharacterById(2),
-            onBackClick = {}
+            state = CharacterDetailState(
+                character = null,
+                isLoading = true
+            ),
+            onEvent = {},
+            onBackClick = {},
+            modifier = Modifier.fillMaxSize()
+        )
+    }
+}
+
+@Preview(name = "Light", showBackground = true)
+@Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun PreviewCharacterDetailScreen_Error() {
+    RickAndMortyTheme {
+        CharacterDetailScreen(
+            state = CharacterDetailState(
+                character = null,
+                hasError = true,
+                isLoading = false
+            ),
+            onEvent = {},
+            onBackClick = {},
+            modifier = Modifier.fillMaxSize()
+        )
+    }
+}
+
+@Preview(name = "Light", showBackground = true)
+@Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun PreviewCharacterDetailScreen_Success() {
+    RickAndMortyTheme {
+        CharacterDetailScreen(
+            state = CharacterDetailState(
+                character = Character(
+                    id = 1,
+                    name = "Rick Sanchez",
+                    status = "Alive",
+                    species = "Human",
+                    gender = "M",
+                    image = ""
+                ),
+                isLoading = false
+            ),
+            onEvent = {},
+            onBackClick = {},
+            modifier = Modifier.fillMaxSize()
         )
     }
 }
