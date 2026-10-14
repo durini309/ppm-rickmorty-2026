@@ -17,13 +17,15 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavOptions
@@ -32,6 +34,8 @@ import com.gt.uvg.rickandmorty.R
 import com.gt.uvg.rickandmorty.character.data.Character
 import com.gt.uvg.rickandmorty.character.data.CharacterDb
 import com.gt.uvg.rickandmorty.character.ui.CharacterImage
+import com.gt.uvg.rickandmorty.core.ui.components.ErrorLayout
+import com.gt.uvg.rickandmorty.core.ui.components.LoadingLayout
 import com.gt.uvg.rickandmorty.core.ui.theme.RickAndMortyTheme
 import kotlinx.serialization.Serializable
 
@@ -49,10 +53,16 @@ fun NavGraphBuilder.charactersScreen(onCharacterClick: (characterId: Int) -> Uni
 }
 
 @Composable
-fun CharactersRoute(onCharacterClick: (characterId: Int) -> Unit) {
-    val characters = remember { CharacterDb().getAllCharacters() }
+fun CharactersRoute(
+    onCharacterClick: (characterId: Int) -> Unit,
+    viewModel: CharactersViewModel = viewModel()
+) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
     CharactersScreen(
-        characters = characters,
+        state = state,
+        onEvent = { event ->
+            viewModel.onEvent(event)
+        },
         onCharacterClick = onCharacterClick
     )
 }
@@ -60,7 +70,8 @@ fun CharactersRoute(onCharacterClick: (characterId: Int) -> Unit) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CharactersScreen(
-    characters: List<Character>,
+    state: CharactersState,
+    onEvent: (CharactersEvent) -> Unit,
     onCharacterClick: (characterId: Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -76,15 +87,41 @@ private fun CharactersScreen(
             )
         }
     ) { innerPadding ->
-        LazyColumn(
-            contentPadding = innerPadding,
-            modifier = Modifier.fillMaxSize()
-        ) {
-            items(characters, key = { it.id }) { character ->
-                CharacterItem(
-                    character = character,
-                    onClick = { onCharacterClick(character.id) }
+        when {
+            state.isLoading -> {
+                LoadingLayout(
+                    onClick = {
+                        onEvent(CharactersEvent.LoadingClick)
+                    },
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding)
                 )
+            }
+
+            state.hasError -> {
+                ErrorLayout(
+                    onRetryClick = {
+                        onEvent(CharactersEvent.RetryClick)
+                    },
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding)
+                )
+            }
+
+            else -> {
+                LazyColumn(
+                    contentPadding = innerPadding,
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    items(state.characters, key = { it.id }) { character ->
+                        CharacterItem(
+                            character = character,
+                            onClick = { onCharacterClick(character.id) }
+                        )
+                    }
+                }
             }
         }
     }
@@ -128,10 +165,45 @@ private fun CharacterItem(
 @Preview(name = "Light", showBackground = true)
 @Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
-private fun PreviewCharactersScreen() {
+private fun PreviewCharactersScreen_Loading() {
     RickAndMortyTheme {
         CharactersScreen(
-            characters = listOf(),
+            state = CharactersState(
+                isLoading = true
+            ),
+            onEvent = {},
+            onCharacterClick = {}
+        )
+    }
+}
+
+@Preview(name = "Light", showBackground = true)
+@Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun PreviewCharactersScreen_Error() {
+    RickAndMortyTheme {
+        CharactersScreen(
+            state = CharactersState(
+                isLoading = false,
+                hasError = true
+            ),
+            onEvent = {},
+            onCharacterClick = {}
+        )
+    }
+}
+
+@Preview(name = "Light", showBackground = true)
+@Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun PreviewCharactersScreen_Success() {
+    RickAndMortyTheme {
+        CharactersScreen(
+            state = CharactersState(
+                characters = CharacterDb().getAllCharacters(),
+                isLoading = false
+            ),
+            onEvent = {},
             onCharacterClick = {}
         )
     }

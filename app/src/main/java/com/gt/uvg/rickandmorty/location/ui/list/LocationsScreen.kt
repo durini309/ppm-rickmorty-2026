@@ -15,16 +15,20 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavOptions
 import androidx.navigation.compose.composable
 import com.gt.uvg.rickandmorty.R
+import com.gt.uvg.rickandmorty.core.ui.components.ErrorLayout
+import com.gt.uvg.rickandmorty.core.ui.components.LoadingLayout
 import com.gt.uvg.rickandmorty.core.ui.theme.RickAndMortyTheme
 import com.gt.uvg.rickandmorty.location.data.Location
 import com.gt.uvg.rickandmorty.location.data.LocationDb
@@ -44,10 +48,16 @@ fun NavGraphBuilder.locationsScreen(onLocationClick: (locationId: Int) -> Unit) 
 }
 
 @Composable
-fun LocationsRoute(onLocationClick: (locationId: Int) -> Unit) {
-    val locations = remember { LocationDb().getAllLocations() }
+fun LocationsRoute(
+    onLocationClick: (locationId: Int) -> Unit,
+    viewModel: LocationsViewModel = viewModel()
+) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
     LocationsScreen(
-        locations = locations,
+        state = state,
+        onEvent = { event ->
+            viewModel.onEvent(event)
+        },
         onLocationClick = onLocationClick
     )
 }
@@ -55,7 +65,8 @@ fun LocationsRoute(onLocationClick: (locationId: Int) -> Unit) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun LocationsScreen(
-    locations: List<Location>,
+    state: LocationsState,
+    onEvent: (LocationsEvent) -> Unit,
     onLocationClick: (locationId: Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -71,15 +82,41 @@ private fun LocationsScreen(
             )
         }
     ) { innerPadding ->
-        LazyColumn(
-            contentPadding = innerPadding,
-            modifier = Modifier.fillMaxSize()
-        ) {
-            items(locations, key = { it.id }) { location ->
-                LocationItem(
-                    location = location,
-                    onClick = { onLocationClick(location.id) }
+        when {
+            state.isLoading -> {
+                LoadingLayout(
+                    onClick = {
+                        onEvent(LocationsEvent.LoadingClick)
+                    },
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding)
                 )
+            }
+
+            state.hasError -> {
+                ErrorLayout(
+                    onRetryClick = {
+                        onEvent(LocationsEvent.RetryClick)
+                    },
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding)
+                )
+            }
+
+            else -> {
+                LazyColumn(
+                    contentPadding = innerPadding,
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    items(state.locations, key = { it.id }) { location ->
+                        LocationItem(
+                            location = location,
+                            onClick = { onLocationClick(location.id) }
+                        )
+                    }
+                }
             }
         }
     }
@@ -113,10 +150,45 @@ private fun LocationItem(
 @Preview(name = "Light", showBackground = true)
 @Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
-private fun PreviewLocationsScreen() {
+private fun PreviewLocationsScreen_Loading() {
     RickAndMortyTheme {
         LocationsScreen(
-            locations = LocationDb().getAllLocations(),
+            state = LocationsState(
+                isLoading = true
+            ),
+            onEvent = {},
+            onLocationClick = {}
+        )
+    }
+}
+
+@Preview(name = "Light", showBackground = true)
+@Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun PreviewLocationsScreen_Error() {
+    RickAndMortyTheme {
+        LocationsScreen(
+            state = LocationsState(
+                isLoading = false,
+                hasError = true
+            ),
+            onEvent = {},
+            onLocationClick = {}
+        )
+    }
+}
+
+@Preview(name = "Light", showBackground = true)
+@Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun PreviewLocationsScreen_Success() {
+    RickAndMortyTheme {
+        LocationsScreen(
+            state = LocationsState(
+                locations = LocationDb().getAllLocations(),
+                isLoading = false
+            ),
+            onEvent = {},
             onLocationClick = {}
         )
     }
