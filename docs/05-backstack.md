@@ -6,56 +6,41 @@ En los ejemplos, el backstack se escribe de abajo hacia arriba: `[Characters, Ch
 
 ## Los casos de la app
 
-Todos estos casos se probaron en el emulador:
-
 | Qué haces | Backstack después | Qué hace back |
 |---|---|---|
-| Abres la app | `[Login]` | Cierra la app |
-| Presionas "Entrar" | `[Characters]` | Cierra la app (Login ya no está) |
+| Abres la app sin sesión | `[Login]` | Cierra la app |
+| Abres la app con sesión guardada | `[Characters]` | Cierra la app |
+| Escribes tu nombre y presionas "Entrar" | `[Characters]` | Cierra la app (Login ya no está) |
 | Tocas un personaje | `[Characters, CharacterDetail]` | Regresa a la lista |
 | Tocas la pestaña Locations | `[Characters, Locations]` | Regresa a Characters |
 | Tocas una location | `[Characters, Locations, LocationDetail]` | Regresa a la lista de locations |
 | Tocas Profile y luego Locations | `[Characters, Locations, LocationDetail]` | Regresa a la lista de locations: el detalle se **restauró** |
 | Tocas Locations estando en Locations | No cambia | Lo mismo que antes; no se duplicó |
 | Tocas la pestaña Characters | `[Characters]` | Cierra la app |
-| En Profile, presionas "Cerrar sesión" | `[Login]` | Cierra la app |
+| En Profile, presionas "Cerrar sesión" | `[Login]` | Cierra la app (no regresa a Profile ni a Characters) |
 
-## Login → Characters: sacar Login
+## Entrar y cerrar sesión: `popUpTo(0)`
+
+Al entrar y al cerrar sesión se navega desde `AppNavHost` (el porqué está en [Sesión con DataStore](06-sesion-datastore.md)). En los dos casos se usa la misma opción:
 
 ```kotlin
-loginScreen(
-    onStartClick = {
-        navController.navigateToCharactersGraph(
-            navOptions {
-                popUpTo(LoginDestination) { inclusive = true }
-            }
-        )
+navController.navigateToCharactersGraph(   // o navigateToLogin(...) al cerrar sesión
+    navOptions {
+        popUpTo(0) { inclusive = true }
     }
 )
 ```
 
-- **`popUpTo(LoginDestination)`**: antes de navegar, saca del backstack todo lo que esté encima de Login.
-- **`inclusive = true`**: y saca también a Login.
+- **`popUpTo(...)`**: antes de navegar, saca del backstack todo lo que esté encima de lo que se indica.
+- **`0`**: es el ID del graph raíz del `NavHost`, el que contiene a todos los demás. Navigation le da ID `0` a un graph que no tiene ruta propia, y nuestro `NavHost` no le pone ruta. Por eso aquí es lo mismo que escribir `popUpTo(navController.graph.id)`. Ojo: si a un `NavHost` le pasas `route = ...`, su ID ya no es `0` y `popUpTo(0)` no saca nada (Navigation lo ignora en silencio).
+- **`inclusive = true`**: saca también el graph raíz. No queda **nada**, y luego se agrega la pantalla a la que navegamos.
 
-Resultado: `[Login]` → `[Characters]`. Si el usuario presiona back en Characters, no regresa al Login: la app se cierra.
+Resultado:
 
-## Cerrar sesión: vaciar todo el backstack
+- **Entrar:** `[Login]` → `[Characters]`. Back en Characters cierra la app; no regresa al Login.
+- **Cerrar sesión:** sin importar cuántas pantallas había (`[Characters, Locations, LocationDetail, Profile]`), queda `[Login]`, y back cierra la app.
 
-```kotlin
-profileScreen(
-    onLogoutClick = {
-        navController.navigateToLogin(
-            navOptions {
-                popUpTo(navController.graph.id) { inclusive = true }
-            }
-        )
-    }
-)
-```
-
-Es la misma idea, pero en vez de sacar hasta una pantalla, saca hasta **`navController.graph`**, que es el graph raíz del `NavHost`: el que contiene a todos los demás. Con `inclusive = true` no queda **nada**, y luego se agrega Login.
-
-Resultado: sin importar cuántas pantallas había (`[Characters, Locations, LocationDetail, Profile]`), queda `[Login]`, y back cierra la app.
+Si en lugar de `popUpTo(0)` hubiéramos navegado sin `navOptions`, al cerrar sesión quedaría `[Characters, ..., Profile, Login]` y back desde el Login regresaría a Profile, con la sesión ya cerrada.
 
 ## Cambiar de pestaña
 

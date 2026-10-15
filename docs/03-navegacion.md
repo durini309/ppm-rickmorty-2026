@@ -55,24 +55,40 @@ fun NavController.navigateToLogin(navOptions: NavOptions? = null) {
     navigate(LoginDestination, navOptions)
 }
 
-// 3. Cómo se registra Login en el NavHost. Solo expone lo que la pantalla
-//    necesita del exterior: qué hacer cuando se presiona "Entrar".
-fun NavGraphBuilder.loginScreen(onStartClick: () -> Unit) {
+// 3. Cómo se registra Login en el NavHost. Login no recibe callbacks: no navega por su cuenta,
+//    solo guarda el nombre en DataStore y AppNavHost reacciona (ver Sesión con DataStore).
+fun NavGraphBuilder.loginScreen() {
     composable<LoginDestination> {
-        LoginRoute(onStartClick = onStartClick)
+        LoginRoute()
     }
 }
 
-// 4. Punto de entrada público de la pantalla.
+// 4. Punto de entrada público de la pantalla: conecta el ViewModel con la UI.
 @Composable
-fun LoginRoute(onStartClick: () -> Unit) {
-    LoginScreen(onStartClick = onStartClick)
+fun LoginRoute(viewModel: LoginViewModel = viewModel()) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    LoginScreen(
+        state = state,
+        onEvent = { event ->
+            viewModel.onEvent(event)
+        }
+    )
 }
 
 // 5. La UI como tal. Es privada: nadie fuera de este archivo la usa directamente.
 @Composable
-private fun LoginScreen(onStartClick: () -> Unit, modifier: Modifier = Modifier) {
-    // Logo, botón "Entrar" y nombre del estudiante
+private fun LoginScreen(state: LoginState, onEvent: (LoginEvent) -> Unit, modifier: Modifier = Modifier) {
+    // Logo, campo "Nombre", botón "Entrar" y nombre del estudiante
+}
+```
+
+Las pantallas que sí navegan por su cuenta reciben un callback. Por ejemplo, la lista de personajes avisa qué personaje se tocó:
+
+```kotlin
+fun NavGraphBuilder.charactersScreen(onCharacterClick: (characterId: Int) -> Unit) {
+    composable<CharactersDestination> {
+        CharactersRoute(onCharacterClick = onCharacterClick)
+    }
 }
 ```
 
@@ -89,21 +105,21 @@ fun NavController.navigateToLocationDetail(locationId: Int, navOptions: NavOptio
 }
 
 fun NavGraphBuilder.locationDetailScreen(onBackClick: () -> Unit) {
-    composable<LocationDetailDestination> { backStackEntry ->
-        // toRoute() reconstruye el destino con sus argumentos ya tipados
-        val destination = backStackEntry.toRoute<LocationDetailDestination>()
-        LocationDetailRoute(
-            locationId = destination.locationId,
-            onBackClick = onBackClick
-        )
+    composable<LocationDetailDestination> {
+        LocationDetailRoute(onBackClick = onBackClick)
     }
 }
+```
 
-@Composable
-fun LocationDetailRoute(locationId: Int, onBackClick: () -> Unit) {
-    // Con el ID buscamos la location completa
-    val location = remember(locationId) { LocationDb().getLocationById(locationId) }
-    LocationDetailScreen(location = location, onBackClick = onBackClick)
+¿Y dónde se lee el ID? En el ViewModel. Navigation le entrega los argumentos del destino en un `SavedStateHandle`, y `toRoute()` los reconstruye ya tipados:
+
+```kotlin
+class LocationDetailViewModel(
+    savedStateHandle: SavedStateHandle
+): ViewModel() {
+    private val destination = savedStateHandle.toRoute<LocationDetailDestination>()
+    private val locationId = destination.locationId
+    // Con el ID buscamos la location completa en LocationDb
 }
 ```
 
@@ -148,21 +164,23 @@ Lo que ganamos:
 
 ## Cómo quedó `AppNavHost`
 
-Con todo esto, el `NavHost` se lee como un índice de la app (se omiten los `navOptions`; esos se explican en [Backstack](05-backstack.md)):
+Con todo esto, el `NavHost` se lee como un índice de la app:
 
 ```kotlin
-NavHost(navController, startDestination = LoginDestination) {
-    loginScreen(onStartClick = { navController.navigateToCharactersGraph(...) })
+NavHost(navController, startDestination = startDestination) {
+    loginScreen()
     charactersGraph(navController)
     locationsGraph(navController)
-    profileScreen(onLogoutClick = { navController.navigateToLogin(...) })
+    profileScreen()
 }
 ```
+
+`startDestination` es Login o Characters según si hay sesión guardada. Login y Profile no reciben callbacks porque la navegación de la sesión (entrar y cerrar sesión) se maneja en un solo lugar de `AppNavHost`; se explica en [Sesión con DataStore](06-sesion-datastore.md).
 
 ## Ventajas
 
 - **El `NavHost` se lee como un índice** de las funcionalidades de la app.
 - **Cada pantalla es dueña de su navegación**: su destino, sus argumentos y su composable viven en el mismo archivo.
 - **Cada funcionalidad es dueña de su graph**: agregar una pantalla a Locations no toca `AppNavHost`.
-- **La UI no conoce el `NavController`**: las pantallas solo reciben callbacks (`onLocationClick`, `onBackClick`, `onLogoutClick`). Eso las hace fáciles de previsualizar y de probar.
+- **La UI no conoce el `NavController`**: las pantallas solo reciben callbacks (`onLocationClick`, `onBackClick`). Eso las hace fáciles de previsualizar y de probar.
 - **Cambiar los argumentos de una pantalla** solo toca su archivo y los lugares que llaman a `navigateTo...`.

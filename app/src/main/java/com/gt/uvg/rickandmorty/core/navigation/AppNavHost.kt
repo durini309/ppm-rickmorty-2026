@@ -7,6 +7,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -17,6 +18,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navOptions
 import com.gt.uvg.rickandmorty.character.ui.list.CharactersDestination
+import com.gt.uvg.rickandmorty.character.ui.navigation.CharactersGraph
 import com.gt.uvg.rickandmorty.character.ui.navigation.charactersGraph
 import com.gt.uvg.rickandmorty.character.ui.navigation.navigateToCharactersGraph
 import com.gt.uvg.rickandmorty.location.ui.navigation.locationsGraph
@@ -24,8 +26,6 @@ import com.gt.uvg.rickandmorty.login.ui.LoginDestination
 import com.gt.uvg.rickandmorty.login.ui.loginScreen
 import com.gt.uvg.rickandmorty.login.ui.navigateToLogin
 import com.gt.uvg.rickandmorty.profile.ui.profileScreen
-import com.gt.uvg.rickandmorty.splash.ui.SplashDestination
-import com.gt.uvg.rickandmorty.splash.ui.splashScreen
 
 @Composable
 fun AppNavHost(
@@ -33,6 +33,16 @@ fun AppNavHost(
     viewModel: AppNavigationViewModel = viewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+
+    // Mientras no hemos leído DataStore no dibujamos nada: el splash del sistema sigue encima (ver MainActivity)
+    val userName = state.userName ?: return
+
+    // La primera pantalla se decide una sola vez, con lo que había en DataStore al abrir la app.
+    // Así no hay que pasar por el Login para luego redirigir a la lista de personajes.
+    val startDestination: Any = remember {
+        if (userName.isEmpty()) LoginDestination else CharactersGraph
+    }
+
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = backStackEntry?.destination
@@ -44,18 +54,13 @@ fun AppNavHost(
         currentDestination?.hierarchy?.any { it.hasRoute(destination.route::class) } == true
     }
 
-    // La navegación de la sesión se decide solo aquí, según el nombre guardado en DataStore.
-    // Login y Profile solo guardan o borran el nombre; cuando cambia, este bloque vuelve a correr.
-    LaunchedEffect(state.userName) {
-        val currentDestination = navController.currentDestination
-        val isInSplash = currentDestination?.hasRoute(SplashDestination::class) == true
-        val isInLogin = currentDestination?.hasRoute(LoginDestination::class) == true
+    // Cuando la sesión cambia (Login guarda el nombre o Profile lo borra), navegamos desde aquí.
+    // Revisamos si estamos en el Login para no navegar de más, por ejemplo al rotar la pantalla.
+    LaunchedEffect(userName) {
+        val isInLogin = navController.currentDestination?.hasRoute(LoginDestination::class) == true
 
-        val userName = state.userName
+        // popUpTo(0) vacía todo el backstack: back en Login o en Characters cierra la app
         when {
-            // Unit = No hacer nada
-            userName == null -> Unit
-
             userName.isEmpty() -> {
                 // No hay sesión: vamos al Login (si no estamos ya ahí)
                 if (!isInLogin) {
@@ -68,9 +73,8 @@ fun AppNavHost(
             }
 
             else -> {
-                // Hay sesión: si estamos en Splash o Login, vamos a la lista de personajes.
-                // Si ya estamos adentro (por ejemplo, al rotar la pantalla en Profile), no hacemos nada.
-                if (isInSplash || isInLogin) {
+                // Hay sesión: si estamos en el Login, vamos a la lista de personajes
+                if (isInLogin) {
                     navController.navigateToCharactersGraph(
                         navOptions {
                             popUpTo(0) { inclusive = true }
@@ -112,12 +116,11 @@ fun AppNavHost(
     ) { innerPadding ->
         NavHost(
             navController = navController,
-            startDestination = SplashDestination,
+            startDestination = startDestination,
             modifier = Modifier
                 .padding(innerPadding)
                 .consumeWindowInsets(innerPadding)
         ) {
-            splashScreen()
             loginScreen()
             charactersGraph(navController)
             locationsGraph(navController)

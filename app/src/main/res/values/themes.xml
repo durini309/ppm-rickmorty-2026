@@ -2,4 +2,11 @@
 <resources>
 
     <style name="Theme.RickAndMorty" parent="android:Theme.Material.Light.NoActionBar" />
+
+    <!-- Tema del splash del sistema (SplashScreen API). Cuando se quita el splash, se usa postSplashScreenTheme -->
+    <style name="Theme.RickAndMorty.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/splash_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/rickmorty_logo</item>
+        <item name="postSplashScreenTheme">@style/Theme.RickAndMorty</item>
+    </style>
 </resources>
