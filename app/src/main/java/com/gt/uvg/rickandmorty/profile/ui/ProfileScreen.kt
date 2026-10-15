@@ -20,6 +20,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -27,6 +28,8 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavOptions
@@ -44,21 +47,28 @@ fun NavController.navigateToProfile(navOptions: NavOptions? = null) {
     navigate(ProfileDestination, navOptions)
 }
 
-fun NavGraphBuilder.profileScreen(onLogoutClick: () -> Unit) {
+fun NavGraphBuilder.profileScreen() {
     composable<ProfileDestination> {
-        ProfileRoute(onLogoutClick = onLogoutClick)
+        ProfileRoute()
     }
 }
 
 @Composable
-fun ProfileRoute(onLogoutClick: () -> Unit) {
-    ProfileScreen(onLogoutClick = onLogoutClick)
+fun ProfileRoute(viewModel: ProfileViewModel = viewModel()) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    ProfileScreen(
+        state = state,
+        onEvent = { event ->
+            viewModel.onEvent(event)
+        }
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ProfileScreen(
-    onLogoutClick: () -> Unit,
+    state: ProfileState,
+    onEvent: (ProfileEvent) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Scaffold(
@@ -85,7 +95,7 @@ private fun ProfileScreen(
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 PropertyRow(
                     label = stringResource(R.string.profile_name_label),
-                    value = stringResource(R.string.profile_name)
+                    value = state.name
                 )
                 PropertyRow(
                     label = stringResource(R.string.profile_student_id_label),
@@ -93,7 +103,11 @@ private fun ProfileScreen(
                 )
             }
             Spacer(modifier = Modifier.height(32.dp))
-            OutlinedButton(onClick = onLogoutClick) {
+            OutlinedButton(
+                onClick = {
+                    onEvent(ProfileEvent.LogoutClick)
+                }
+            ) {
                 Text(text = stringResource(R.string.profile_logout))
             }
         }
@@ -123,6 +137,9 @@ private fun ProfileImage(modifier: Modifier = Modifier) {
 @Composable
 private fun PreviewProfileScreen() {
     RickAndMortyTheme {
-        ProfileScreen(onLogoutClick = {})
+        ProfileScreen(
+            state = ProfileState(name = "Rick Sanchez"),
+            onEvent = {}
+        )
     }
 }

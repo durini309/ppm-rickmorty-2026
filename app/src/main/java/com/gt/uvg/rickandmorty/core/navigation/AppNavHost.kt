@@ -5,8 +5,11 @@ import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.compose.NavHost
@@ -21,9 +24,15 @@ import com.gt.uvg.rickandmorty.login.ui.LoginDestination
 import com.gt.uvg.rickandmorty.login.ui.loginScreen
 import com.gt.uvg.rickandmorty.login.ui.navigateToLogin
 import com.gt.uvg.rickandmorty.profile.ui.profileScreen
+import com.gt.uvg.rickandmorty.splash.ui.SplashDestination
+import com.gt.uvg.rickandmorty.splash.ui.splashScreen
 
 @Composable
-fun AppNavHost(modifier: Modifier = Modifier) {
+fun AppNavHost(
+    modifier: Modifier = Modifier,
+    viewModel: AppNavigationViewModel = viewModel()
+) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = backStackEntry?.destination
@@ -33,6 +42,43 @@ fun AppNavHost(modifier: Modifier = Modifier) {
     // En Login no hay ninguna (null) y por eso no se muestra el BottomNavigation.
     val selectedDestination = TopLevelDestination.entries.firstOrNull { destination ->
         currentDestination?.hierarchy?.any { it.hasRoute(destination.route::class) } == true
+    }
+
+    // La navegación de la sesión se decide solo aquí, según el nombre guardado en DataStore.
+    // Login y Profile solo guardan o borran el nombre; cuando cambia, este bloque vuelve a correr.
+    LaunchedEffect(state.userName) {
+        val currentDestination = navController.currentDestination
+        val isInSplash = currentDestination?.hasRoute(SplashDestination::class) == true
+        val isInLogin = currentDestination?.hasRoute(LoginDestination::class) == true
+
+        val userName = state.userName
+        when {
+            // Unit = No hacer nada
+            userName == null -> Unit
+
+            userName.isEmpty() -> {
+                // No hay sesión: vamos al Login (si no estamos ya ahí)
+                if (!isInLogin) {
+                    navController.navigateToLogin(
+                        navOptions {
+                            popUpTo(0) { inclusive = true }
+                        }
+                    )
+                }
+            }
+
+            else -> {
+                // Hay sesión: si estamos en Splash o Login, vamos a la lista de personajes.
+                // Si ya estamos adentro (por ejemplo, al rotar la pantalla en Profile), no hacemos nada.
+                if (isInSplash || isInLogin) {
+                    navController.navigateToCharactersGraph(
+                        navOptions {
+                            popUpTo(0) { inclusive = true }
+                        }
+                    )
+                }
+            }
+        }
     }
 
     Scaffold(
@@ -66,33 +112,16 @@ fun AppNavHost(modifier: Modifier = Modifier) {
     ) { innerPadding ->
         NavHost(
             navController = navController,
-            startDestination = LoginDestination,
+            startDestination = SplashDestination,
             modifier = Modifier
                 .padding(innerPadding)
                 .consumeWindowInsets(innerPadding)
         ) {
-            loginScreen(
-                onStartClick = {
-                    // Sacamos Login del backstack: back en Characters cierra la app
-                    navController.navigateToCharactersGraph(
-                        navOptions {
-                            popUpTo(LoginDestination) { inclusive = true }
-                        }
-                    )
-                }
-            )
+            splashScreen()
+            loginScreen()
             charactersGraph(navController)
             locationsGraph(navController)
-            profileScreen(
-                onLogoutClick = {
-                    // Vaciamos todo el backstack: back en Login cierra la app
-                    navController.navigateToLogin(
-                        navOptions {
-                            popUpTo(navController.graph.id) { inclusive = true }
-                        }
-                    )
-                }
-            )
+            profileScreen()
         }
     }
 }
